@@ -44,103 +44,32 @@ const BALL_CSS = BALL_COLORS_HEX.slice();
 // ─── Screen Management ──────────────────────────────────────
 function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
 }
 
-// ─── Auth ────────────────────────────────────────────────────
-document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
-        document.getElementById(btn.dataset.tab + '-form').classList.add('active');
-    });
-});
-
-async function authAction(endpoint, user, pass) {
-    const res = await fetch(endpoint, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user.trim(), password: pass })
-    }).then(r => r.json());
-    if (res.success) enterLobby(res.username, res.token);
-    else document.getElementById('auth-error').textContent = res.error;
-}
-
-document.getElementById('login-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    authAction('/api/login', document.getElementById('login-user').value, document.getElementById('login-pass').value);
-});
-document.getElementById('signup-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    authAction('/api/signup', document.getElementById('signup-user').value, document.getElementById('signup-pass').value);
-});
-
-function enterLobby(username, token) {
-    currentUser = username;
-    currentToken = token;
-    document.getElementById('username-display').textContent = username;
-    socket.emit('identify', { username, token });
-    showScreen('lobby-screen');
-}
-
-// ─── Lobby ───────────────────────────────────────────────────
-document.getElementById('host-btn').addEventListener('click', () => socket.emit('hostRoom'));
-
-document.getElementById('join-btn').addEventListener('click', () => {
-    document.getElementById('join-modal').classList.remove('hidden');
-    document.getElementById('join-code-input').value = '';
-    document.getElementById('join-error').textContent = '';
-});
-document.getElementById('join-cancel').addEventListener('click', () => document.getElementById('join-modal').classList.add('hidden'));
-document.getElementById('join-submit').addEventListener('click', () => {
-    const code = document.getElementById('join-code-input').value.trim().toUpperCase();
-    if (code.length >= 4) socket.emit('joinRoom', { code });
-});
-
-// ─── AI Menu ─────────────────────────────────────────────────
-document.getElementById('ai-btn').addEventListener('click', () => {
-    document.getElementById('ai-menu').classList.remove('hidden');
-});
-document.getElementById('ai-cancel').addEventListener('click', () => {
-    document.getElementById('ai-menu').classList.add('hidden');
-});
-document.querySelectorAll('.diff-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        document.getElementById('ai-menu').classList.add('hidden');
-        socket.emit('startAI', { difficulty: btn.dataset.diff });
-    });
-});
-
-// ─── Socket Events ───────────────────────────────────────────
+// ─── Socket Events (Global) ──────────────────────────────────
 socket.on('roomCreated', (data) => {
-    document.getElementById('room-code-display').textContent = data.code;
+    const r = document.getElementById('room-code-display');
+    if (r) r.textContent = data.code;
     showScreen('room-screen');
 });
-socket.on('joinError', (msg) => { document.getElementById('join-error').textContent = msg; });
+socket.on('joinError', (msg) => { 
+    const e = document.getElementById('join-error');
+    if (e) e.textContent = msg; 
+});
 socket.on('gameStarted', (data) => {
-    document.getElementById('join-modal').classList.add('hidden');
+    const m = document.getElementById('join-modal');
+    if (m) m.classList.add('hidden');
     startGame(data.players);
 });
 
-// Groups
-document.getElementById('groups-btn').addEventListener('click', () => {
-    socket.emit('getGroups');
-    showScreen('group-screen');
-});
-document.getElementById('groups-back').addEventListener('click', () => showScreen('lobby-screen'));
-document.getElementById('create-group-btn').addEventListener('click', () => {
-    const name = document.getElementById('new-group-name').value.trim();
-    if (name) { socket.emit('createGroup', { name }); document.getElementById('new-group-name').value = ''; }
-});
-document.getElementById('join-group-btn').addEventListener('click', () => {
-    const id = document.getElementById('join-group-id').value.trim();
-    if (id) { socket.emit('joinGroup', { id }); document.getElementById('join-group-id').value = ''; }
-});
 socket.on('groupCreated', () => socket.emit('getGroups'));
 socket.on('groupJoined', () => socket.emit('getGroups'));
 
 socket.on('groupsList', (list) => {
     const container = document.getElementById('group-list');
+    if (!container) return;
     container.innerHTML = '';
     list.forEach(g => {
         const card = document.createElement('div');
@@ -159,64 +88,193 @@ socket.on('groupsList', (list) => {
 });
 
 socket.on('presenceUpdate', () => {
-    if (document.getElementById('group-screen').classList.contains('active')) socket.emit('getGroups');
+    const gs = document.getElementById('group-screen');
+    if (gs && gs.classList.contains('active')) socket.emit('getGroups');
 });
 
-// Match invite
 socket.on('matchInvite', (data) => {
     const toast = document.getElementById('invite-toast');
-    document.getElementById('invite-msg').textContent = data.from + ' invited you from ' + data.groupName + '!';
+    if (!toast) return;
+    const msg = document.getElementById('invite-msg');
+    if (msg) msg.textContent = data.from + ' invited you from ' + data.groupName + '!';
     toast.classList.remove('hidden');
+    
     document.getElementById('invite-accept').onclick = () => { socket.emit('joinRoom', { code: data.code }); toast.classList.add('hidden'); };
     document.getElementById('invite-decline').onclick = () => toast.classList.add('hidden');
 });
 
-// Game over
 socket.on('gameOver', (data) => {
     const overlay = document.getElementById('gameover-overlay');
-    document.getElementById('gameover-title').textContent = data.winner === currentUser ? 'You Win!' : 'You Lose';
-    document.getElementById('gameover-reason').textContent = data.reason;
+    if (!overlay) return;
+    const t = document.getElementById('gameover-title');
+    const r = document.getElementById('gameover-reason');
+    if (t) t.textContent = data.winner === currentUser ? 'You Win!' : 'You Lose';
+    if (r) r.textContent = data.reason;
     overlay.classList.remove('hidden');
 });
-document.getElementById('gameover-lobby').addEventListener('click', () => {
-    document.getElementById('gameover-overlay').classList.add('hidden');
-    if (phaserGame) { phaserGame.destroy(true); phaserGame = null; }
-    showScreen('lobby-screen');
-});
 
-// Leave game
-document.getElementById('exit-game-btn').addEventListener('click', () => {
-    if (phaserGame) { phaserGame.destroy(true); phaserGame = null; }
-    showScreen('lobby-screen');
-});
-
-// Mute toggle
-let isMuted = false;
-document.getElementById('mute-game-btn').addEventListener('click', (e) => {
-    isMuted = !isMuted;
-    const btn = e.currentTarget;
-    if (isMuted) {
-        btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
-        btn.style.color = 'var(--red)';
-        if (phaserGame) phaserGame.sound.mute = true;
-    } else {
-        btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z M19 12h.01 M16 9h.01 M16 15h.01 M22 9h.01 M22 15h.01"/></svg>';
-        btn.style.color = 'var(--text)';
-        if (phaserGame) phaserGame.sound.mute = false;
+// ─── Helpers ─────────────────────────────────────────────────
+async function authAction(endpoint, user, pass) {
+    const res = await fetch(endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user.trim(), password: pass })
+    }).then(r => r.json());
+    if (res.success) enterLobby(res.username, res.token);
+    else {
+        const err = document.getElementById('auth-error');
+        if (err) err.textContent = res.error;
     }
-});
+}
 
-// Fullscreen
-document.getElementById('fullscreen-btn').addEventListener('click', () => {
-    if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
-    else document.exitFullscreen();
-});
+function enterLobby(username, token) {
+    currentUser = username;
+    currentToken = token;
+    const u = document.getElementById('username-display');
+    if (u) u.textContent = username;
+    socket.emit('identify', { username, token });
+    showScreen('lobby-screen');
+}
 
-// Ping
-setInterval(() => {
-    const t = Date.now();
-    socket.emit('pingEvent', () => { document.getElementById('ping-val').textContent = Date.now() - t; });
-}, 2000);
+// ─── DOM Initialization ──────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    // Initial State: Force Auth Screen
+    showScreen('auth-screen');
+
+    function onEv(id, ev, cb) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener(ev, cb);
+    }
+    function onBtn(id, cb) { onEv(id, 'click', cb); }
+
+    // Auth
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+            const f = document.getElementById(btn.dataset.tab + '-form');
+            if (f) f.classList.add('active');
+        });
+    });
+
+    onEv('login-form', 'submit', (e) => {
+        e.preventDefault();
+        const u = document.getElementById('login-user'), p = document.getElementById('login-pass');
+        if (u && p) authAction('/api/login', u.value, p.value);
+    });
+    
+    onEv('signup-form', 'submit', (e) => {
+        e.preventDefault();
+        const u = document.getElementById('signup-user'), p = document.getElementById('signup-pass');
+        if (u && p) authAction('/api/signup', u.value, p.value);
+    });
+
+    // Lobby
+    onBtn('host-btn', () => socket.emit('hostRoom'));
+    onBtn('join-btn', () => {
+        const m = document.getElementById('join-modal');
+        if (m) {
+            m.classList.remove('hidden');
+            const c = document.getElementById('join-code-input');
+            const e = document.getElementById('join-error');
+            if (c) c.value = '';
+            if (e) e.textContent = '';
+        }
+    });
+    onBtn('join-cancel', () => {
+        const m = document.getElementById('join-modal');
+        if (m) m.classList.add('hidden');
+    });
+    onBtn('join-submit', () => {
+        const i = document.getElementById('join-code-input');
+        if (i) {
+            const code = i.value.trim().toUpperCase();
+            if (code.length >= 4) socket.emit('joinRoom', { code });
+        }
+    });
+
+    // AI Menu
+    onBtn('ai-btn', () => {
+        const m = document.getElementById('ai-menu');
+        if (m) m.classList.remove('hidden');
+    });
+    onBtn('ai-cancel', () => {
+        const m = document.getElementById('ai-menu');
+        if (m) m.classList.add('hidden');
+    });
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const m = document.getElementById('ai-menu');
+            if (m) m.classList.add('hidden');
+            socket.emit('startAI', { difficulty: btn.dataset.diff });
+        });
+    });
+
+    // Groups
+    onBtn('groups-btn', () => {
+        socket.emit('getGroups');
+        showScreen('group-screen');
+    });
+    onBtn('groups-back', () => showScreen('lobby-screen'));
+    onBtn('create-group-btn', () => {
+        const i = document.getElementById('new-group-name');
+        if (i) {
+            const name = i.value.trim();
+            if (name) { socket.emit('createGroup', { name }); i.value = ''; }
+        }
+    });
+    onBtn('join-group-btn', () => {
+        const i = document.getElementById('join-group-id');
+        if (i) {
+            const id = i.value.trim();
+            if (id) { socket.emit('joinGroup', { id }); i.value = ''; }
+        }
+    });
+
+    // Game Over & Overlays
+    onBtn('gameover-lobby', () => {
+        const o = document.getElementById('gameover-overlay');
+        if (o) o.classList.add('hidden');
+        if (phaserGame) { phaserGame.destroy(true); phaserGame = null; }
+        showScreen('lobby-screen');
+    });
+
+    onBtn('exit-game-btn', () => {
+        if (phaserGame) { phaserGame.destroy(true); phaserGame = null; }
+        showScreen('lobby-screen');
+    });
+
+    // Mute toggle
+    let isMuted = false;
+    onBtn('mute-game-btn', (e) => {
+        isMuted = !isMuted;
+        const btn = e.currentTarget;
+        if (isMuted) {
+            btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
+            btn.style.color = 'var(--red)';
+            if (phaserGame && phaserGame.sound) phaserGame.sound.mute = true;
+        } else {
+            btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z M19 12h.01 M16 9h.01 M16 15h.01 M22 9h.01 M22 15h.01"/></svg>';
+            btn.style.color = 'var(--text)';
+            if (phaserGame && phaserGame.sound) phaserGame.sound.mute = false;
+        }
+    });
+
+    onBtn('fullscreen-btn', () => {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
+        else document.exitFullscreen();
+    });
+
+    // Ping
+    setInterval(() => {
+        const t = Date.now();
+        socket.emit('pingEvent', () => { 
+            const p = document.getElementById('ping-val');
+            if (p) p.textContent = Date.now() - t; 
+        });
+    }, 2000);
+
+}); // End DOMContentLoaded
 
 // ═══════════════════════════════════════════════════════════
 //  PHASER GAME — HIGH RESOLUTION
@@ -234,8 +292,10 @@ function startGame(players) {
     myPlayerIndex = players.indexOf(currentUser);
     showScreen('game-screen');
 
-    document.getElementById('p1-name').textContent = players[0] || 'P1';
-    document.getElementById('p2-name').textContent = players[1] || 'P2';
+    const p1n = document.getElementById('p1-name');
+    const p2n = document.getElementById('p2-name');
+    if (p1n) p1n.textContent = players[0] || 'P1';
+    if (p2n) p2n.textContent = players[1] || 'P2';
 
     if (phaserGame) { phaserGame.destroy(true); phaserGame = null; }
 
@@ -248,6 +308,7 @@ function startGame(players) {
             width: GAME_W,
             height: GAME_H
         },
+        contextCreation: { willReadFrequently: true },
         render: {
             antialias: true,
             pixelArt: false,
