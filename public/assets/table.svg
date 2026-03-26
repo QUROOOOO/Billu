@@ -20,7 +20,7 @@
     <rect x="14" y="74" width="392" height="672" rx="14" fill="url(#wood)"/>
     <rect x="22" y="82" width="376" height="656" rx="8" fill="#5D4037" opacity="0.8"/>
     <rect x="40" y="100" width="340" height="620" fill="url(#felt)"/>
-    <rect x="40" y="100" width="340" height="8" fill="#1E3A8A" opacity="0.4"/>
+    <rect x="40" y="100" width="340" height="620" fill="none" stroke="#0B1120" stroke-width="12" opacity="0.6"/>
     <rect x="40" y="712" width="340" height="8" fill="#1E3A8A" opacity="0.4"/>
     <rect x="40" y="100" width="8" height="620" fill="#1E3A8A" opacity="0.4"/>
     <rect x="372" y="100" width="8" height="620" fill="#1E3A8A" opacity="0.4"/>

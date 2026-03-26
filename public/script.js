@@ -327,11 +327,7 @@ function gameCreate() {
         
         let cb = serverState.balls[0];
         if (!cb.pocketed) {
-            let dx = pointer.x - cb.x;
-            let dy = pointer.y - cb.y;
-            if (Math.sqrt(dx*dx + dy*dy) < BALL_R * 3) { // generous hit box
-                dragState = { startX: pointer.x, startY: pointer.y, currentX: pointer.x, currentY: pointer.y };
-            }
+            dragState = { startX: pointer.x, startY: pointer.y, currentX: pointer.x, currentY: pointer.y };
         }
     });
 
@@ -348,7 +344,8 @@ function gameCreate() {
         let force = Math.sqrt(dx*dx + dy*dy);
         if (force > 5) {
             let clampedForce = Math.min(force, MAX_DRAG);
-            socket.emit('shoot', { vec: { x: dx, y: dy }, power: clampedForce / MAX_DRAG });
+            // Multiply power by 100x to ensure tangible Matter.js force
+            socket.emit('shoot', { vec: { x: dx, y: dy }, power: (clampedForce / MAX_DRAG) * 100 });
         }
         dragState = null;
         aimGraphics.clear();

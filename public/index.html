@@ -12,7 +12,7 @@
         <!-- Auth Screen -->
         <div id="auth-screen" class="screen">
             <div class="card shadow-lg">
-                <h1 class="logo-title">🎱 Billu</h1>
+                <h1 class="logo-title">Billu</h1>
                 <p class="subtitle">A Playful Billiards Experience</p>
                 <div class="auth-tabs">
                     <button class="tab-btn active" data-tab="login">Login</button>
@@ -102,55 +102,53 @@
             <div id="group-list" class="scroll-list"></div>
         </div>
 
-        <!-- Game Screen (Playful Bright UI Overlay over Canvas) -->
+        <!-- Game Screen (Playful Bright UI Flexbox Layout) -->
         <div id="game-screen" class="screen">
+            <!-- Top Score HUD -->
+            <div class="hud-top shadow-sm">
+                <div class="player-hud" id="p1-info">
+                    <div class="avatar bg-blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    </div>
+                    <div class="hud-details">
+                        <span class="p-name" id="p1-name">P1</span>
+                        <div class="ball-dots" id="p1-dots"></div>
+                    </div>
+                </div>
+                
+                <div id="turn-indicator" class="turn-arrow">
+                    <svg viewBox="0 0 24 24" fill="var(--color-primary)"><path d="M12 21l-9-9h18z"/></svg>
+                </div>
+                
+                <div class="player-hud reverse" id="p2-info">
+                    <div class="hud-details align-right">
+                        <span class="p-name" id="p2-name">P2</span>
+                        <div class="ball-dots" id="p2-dots"></div>
+                    </div>
+                    <div class="avatar bg-red">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    </div>
+                </div>
+            </div>
+
             <!-- Phaser Target -->
             <div id="game-container"></div>
             
-            <div id="game-ui-overlay">
-                <!-- Top Score HUD -->
-                <div class="hud-top shadow-lg">
-                    <div class="player-hud" id="p1-info">
-                        <div class="avatar bg-blue">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                        </div>
-                        <div class="hud-details">
-                            <span class="p-name" id="p1-name">P1</span>
-                            <div class="ball-dots" id="p1-dots"></div>
-                        </div>
-                    </div>
-                    
-                    <div id="turn-indicator" class="turn-arrow">
-                        <svg viewBox="0 0 24 24" fill="var(--color-primary)"><path d="M12 21l-9-9h18z"/></svg>
-                    </div>
-                    
-                    <div class="player-hud reverse" id="p2-info">
-                        <div class="hud-details align-right">
-                            <span class="p-name" id="p2-name">P2</span>
-                            <div class="ball-dots" id="p2-dots"></div>
-                        </div>
-                        <div class="avatar bg-red">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Bottom Controls HUD -->
-                <div class="hud-bottom shadow-lg">
-                    <button id="exit-game-btn" class="hud-btn bg-red-light">
-                        <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-                    </button>
-                    
-                    <div class="ping-pill">Ping: <span id="ping-val">--</span>ms</div>
-                    
-                    <button id="mute-game-btn" class="hud-btn">
-                        <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19 12h.01 M16 9h.01 M16 15h.01 M22 9h.01 M22 15h.01"/></svg>
-                    </button>
-                    
-                    <button id="fullscreen-btn" class="hud-btn">
-                        <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round"><path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M3 16v3a2 2 0 002 2h3"/></svg>
-                    </button>
-                </div>
+            <!-- Bottom Controls HUD -->
+            <div class="hud-bottom shadow-sm">
+                <button id="exit-game-btn" class="hud-btn bg-red-light">
+                    <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                </button>
+                
+                <div class="ping-pill">Ping: <span id="ping-val">--</span>ms</div>
+                
+                <button id="mute-game-btn" class="hud-btn">
+                    <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19 12h.01 M16 9h.01 M16 15h.01 M22 9h.01 M22 15h.01"/></svg>
+                </button>
+                
+                <button id="fullscreen-btn" class="hud-btn">
+                    <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round"><path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M3 16v3a2 2 0 002 2h3"/></svg>
+                </button>
             </div>
             
             <!-- Game Over Overlay -->
