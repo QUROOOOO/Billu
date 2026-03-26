@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   BILLU – Client Script (High-Res Mobile-First, No Hover)
+   BILLU – Client Script (Fully Rebuilt UI, Bright & Playful)
    ═══════════════════════════════════════════════════════════ */
 const socket = io();
 
@@ -7,198 +7,103 @@ const socket = io();
 let currentUser = null;
 let currentToken = null;
 let phaserGame = null;
+let globalMute = false;
 
-// ─── Constants ───────────────────────────────────────────────
+// ─── Phaser Constants & Config ───────────────────────────────
 const GAME_W = 420, GAME_H = 780;
 const TBL_L = 40, TBL_R = 380, TBL_T = 100, TBL_B = 720;
 const CX = 210;
 const BALL_R = 9;
 const POCKET_R = 19;
 const MAX_DRAG = 160;
-const POCKET_POS = [
-    { x: TBL_L, y: TBL_T }, { x: CX, y: TBL_T - 4 }, { x: TBL_R, y: TBL_T },
-    { x: TBL_L, y: TBL_B }, { x: CX, y: TBL_B + 4 }, { x: TBL_R, y: TBL_B }
-];
 
-const BALL_COLORS_HEX = [
-    '#F0F0F0',  // 0: cue (white)
-    '#F9C80E',  // 1: yellow
-    '#1565C0',  // 2: blue
-    '#E53935',  // 3: red
-    '#6A1B9A',  // 4: purple
-    '#EF6C00',  // 5: orange
-    '#2E7D32',  // 6: green
-    '#5D4037',  // 7: brown
-    '#1A1A1A',  // 8: black
-    '#F9C80E',  // 9: yellow stripe
-    '#1565C0',  // 10: blue stripe
-    '#E53935',  // 11: red stripe
-    '#6A1B9A',  // 12: purple stripe
-    '#EF6C00',  // 13: orange stripe
-    '#2E7D32',  // 14: green stripe
-    '#5D4037',  // 15: brown stripe
-];
+// Helper: Bind Event safely
+function bindEv(id, type, cb) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(type, cb);
+}
 
-const BALL_CSS = BALL_COLORS_HEX.slice();
-
-// ─── Screen Management ──────────────────────────────────────
+// Helper: Show Screen strictly
 function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     const el = document.getElementById(id);
     if (el) el.classList.add('active');
 }
 
-// ─── Socket Events (Global) ──────────────────────────────────
-socket.on('roomCreated', (data) => {
-    const r = document.getElementById('room-code-display');
-    if (r) r.textContent = data.code;
-    showScreen('room-screen');
-});
-socket.on('joinError', (msg) => { 
-    const e = document.getElementById('join-error');
-    if (e) e.textContent = msg; 
-});
-socket.on('gameStarted', (data) => {
-    const m = document.getElementById('join-modal');
-    if (m) m.classList.add('hidden');
-    startGame(data.players);
-});
-
-socket.on('groupCreated', () => socket.emit('getGroups'));
-socket.on('groupJoined', () => socket.emit('getGroups'));
-
-socket.on('groupsList', (list) => {
-    const container = document.getElementById('group-list');
-    if (!container) return;
-    container.innerHTML = '';
-    list.forEach(g => {
-        const card = document.createElement('div');
-        card.className = 'group-card';
-        let membersHTML = g.members.map(m =>
-            '<div class="member-row"><span class="status-dot ' + (m.online ? 'online' : 'offline') + '"></span><span>' + m.name + '</span></div>'
-        ).join('');
-        card.innerHTML = '<h4>' + g.name + ' <small>ID: ' + g.id + '</small></h4>' +
-            membersHTML +
-            '<button class="play-now-btn" data-gid="' + g.id + '">Play Now</button>';
-        container.appendChild(card);
-    });
-    container.querySelectorAll('.play-now-btn').forEach(btn => {
-        btn.addEventListener('click', () => socket.emit('groupInvite', { groupId: btn.dataset.gid }));
-    });
-});
-
-socket.on('presenceUpdate', () => {
-    const gs = document.getElementById('group-screen');
-    if (gs && gs.classList.contains('active')) socket.emit('getGroups');
-});
-
-socket.on('matchInvite', (data) => {
-    const toast = document.getElementById('invite-toast');
-    if (!toast) return;
-    const msg = document.getElementById('invite-msg');
-    if (msg) msg.textContent = data.from + ' invited you from ' + data.groupName + '!';
-    toast.classList.remove('hidden');
-    
-    document.getElementById('invite-accept').onclick = () => { socket.emit('joinRoom', { code: data.code }); toast.classList.add('hidden'); };
-    document.getElementById('invite-decline').onclick = () => toast.classList.add('hidden');
-});
-
-socket.on('gameOver', (data) => {
-    const overlay = document.getElementById('gameover-overlay');
-    if (!overlay) return;
-    const t = document.getElementById('gameover-title');
-    const r = document.getElementById('gameover-reason');
-    if (t) t.textContent = data.winner === currentUser ? 'You Win!' : 'You Lose';
-    if (r) r.textContent = data.reason;
-    overlay.classList.remove('hidden');
-});
-
-// ─── Helpers ─────────────────────────────────────────────────
-async function authAction(endpoint, user, pass) {
-    const res = await fetch(endpoint, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user.trim(), password: pass })
-    }).then(r => r.json());
-    if (res.success) enterLobby(res.username, res.token);
-    else {
-        const err = document.getElementById('auth-error');
-        if (err) err.textContent = res.error;
-    }
-}
-
-function enterLobby(username, token) {
-    currentUser = username;
-    currentToken = token;
-    const u = document.getElementById('username-display');
-    if (u) u.textContent = username;
-    socket.emit('identify', { username, token });
-    showScreen('lobby-screen');
-}
-
-// ─── DOM Initialization ──────────────────────────────────────
+// ─── DOM Initialization & Routing ────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    // Initial State: Force Auth Screen
+    // 1. Force Auth Screen initially, hide canvas
     showScreen('auth-screen');
 
-    function onEv(id, ev, cb) {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener(ev, cb);
-    }
-    function onBtn(id, cb) { onEv(id, 'click', cb); }
-
-    // Auth
-    document.querySelectorAll('.tab-btn').forEach(btn => {
+    // 2. Auth Flow
+    const tabs = document.querySelectorAll('.tab-btn');
+    tabs.forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            tabs.forEach(t => t.classList.remove('active'));
             btn.classList.add('active');
             document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
-            const f = document.getElementById(btn.dataset.tab + '-form');
-            if (f) f.classList.add('active');
+            const form = document.getElementById(btn.dataset.tab + '-form');
+            if (form) form.classList.add('active');
         });
     });
 
-    onEv('login-form', 'submit', (e) => {
+    bindEv('login-form', 'submit', async (e) => {
         e.preventDefault();
-        const u = document.getElementById('login-user'), p = document.getElementById('login-pass');
-        if (u && p) authAction('/api/login', u.value, p.value);
-    });
-    
-    onEv('signup-form', 'submit', (e) => {
-        e.preventDefault();
-        const u = document.getElementById('signup-user'), p = document.getElementById('signup-pass');
-        if (u && p) authAction('/api/signup', u.value, p.value);
-    });
-
-    // Lobby
-    onBtn('host-btn', () => socket.emit('hostRoom'));
-    onBtn('join-btn', () => {
-        const m = document.getElementById('join-modal');
-        if (m) {
-            m.classList.remove('hidden');
-            const c = document.getElementById('join-code-input');
-            const e = document.getElementById('join-error');
-            if (c) c.value = '';
-            if (e) e.textContent = '';
+        const u = document.getElementById('login-user').value.trim();
+        const p = document.getElementById('login-pass').value;
+        const res = await fetch('/api/login', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, password: p })
+        }).then(r => r.json());
+        
+        if (res.success) enterLobby(res.username, res.token);
+        else {
+            const err = document.getElementById('auth-error-login');
+            if (err) err.textContent = res.error;
         }
     });
-    onBtn('join-cancel', () => {
+
+    bindEv('signup-form', 'submit', async (e) => {
+        e.preventDefault();
+        const u = document.getElementById('signup-user').value.trim();
+        const p = document.getElementById('signup-pass').value;
+        const res = await fetch('/api/signup', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: u, password: p })
+        }).then(r => r.json());
+        
+        if (res.success) enterLobby(res.username, res.token);
+        else {
+            const err = document.getElementById('auth-error-signup');
+            if (err) err.textContent = res.error;
+        }
+    });
+
+    // 3. Lobby UI
+    bindEv('host-btn', 'click', () => socket.emit('hostRoom'));
+    
+    bindEv('join-btn', 'click', () => {
+        const modal = document.getElementById('join-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            document.getElementById('join-code-input').value = '';
+            document.getElementById('join-error').textContent = '';
+        }
+    });
+    bindEv('join-cancel', 'click', () => {
         const m = document.getElementById('join-modal');
         if (m) m.classList.add('hidden');
     });
-    onBtn('join-submit', () => {
-        const i = document.getElementById('join-code-input');
-        if (i) {
-            const code = i.value.trim().toUpperCase();
-            if (code.length >= 4) socket.emit('joinRoom', { code });
-        }
+    bindEv('join-submit', 'click', () => {
+        const c = document.getElementById('join-code-input').value.trim().toUpperCase();
+        if (c.length >= 4) socket.emit('joinRoom', { code: c });
     });
 
-    // AI Menu
-    onBtn('ai-btn', () => {
+    bindEv('ai-btn', 'click', () => {
         const m = document.getElementById('ai-menu');
         if (m) m.classList.remove('hidden');
     });
-    onBtn('ai-cancel', () => {
+    bindEv('ai-cancel', 'click', () => {
         const m = document.getElementById('ai-menu');
         if (m) m.classList.add('hidden');
     });
@@ -211,74 +116,128 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Groups
-    onBtn('groups-btn', () => {
+    bindEv('groups-btn', 'click', () => {
         socket.emit('getGroups');
         showScreen('group-screen');
     });
-    onBtn('groups-back', () => showScreen('lobby-screen'));
-    onBtn('create-group-btn', () => {
+    bindEv('groups-back', 'click', () => showScreen('lobby-screen'));
+    bindEv('create-group-btn', 'click', () => {
         const i = document.getElementById('new-group-name');
-        if (i) {
-            const name = i.value.trim();
-            if (name) { socket.emit('createGroup', { name }); i.value = ''; }
-        }
+        if (i && i.value.trim()) { socket.emit('createGroup', { name: i.value.trim() }); i.value = ''; }
     });
-    onBtn('join-group-btn', () => {
+    bindEv('join-group-btn', 'click', () => {
         const i = document.getElementById('join-group-id');
-        if (i) {
-            const id = i.value.trim();
-            if (id) { socket.emit('joinGroup', { id }); i.value = ''; }
-        }
+        if (i && i.value.trim()) { socket.emit('joinGroup', { id: i.value.trim() }); i.value = ''; }
     });
 
-    // Game Over & Overlays
-    onBtn('gameover-lobby', () => {
-        const o = document.getElementById('gameover-overlay');
-        if (o) o.classList.add('hidden');
-        if (phaserGame) { phaserGame.destroy(true); phaserGame = null; }
-        showScreen('lobby-screen');
-    });
+    // 4. Game Controls UI
+    bindEv('exit-game-btn', 'click', () => { window.location.reload(); });
+    bindEv('exit-room-btn', 'click', () => { window.location.reload(); });
+    bindEv('gameover-lobby', 'click', () => { window.location.reload(); });
 
-    onBtn('exit-game-btn', () => {
-        if (phaserGame) { phaserGame.destroy(true); phaserGame = null; }
-        showScreen('lobby-screen');
-    });
-
-    // Mute toggle
-    let isMuted = false;
-    onBtn('mute-game-btn', (e) => {
-        isMuted = !isMuted;
-        const btn = e.currentTarget;
-        if (isMuted) {
-            btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
-            btn.style.color = 'var(--red)';
-            if (phaserGame && phaserGame.sound) phaserGame.sound.mute = true;
-        } else {
-            btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z M19 12h.01 M16 9h.01 M16 15h.01 M22 9h.01 M22 15h.01"/></svg>';
-            btn.style.color = 'var(--text)';
-            if (phaserGame && phaserGame.sound) phaserGame.sound.mute = false;
-        }
-    });
-
-    onBtn('fullscreen-btn', () => {
+    bindEv('fullscreen-btn', 'click', () => {
         if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
         else document.exitFullscreen();
+    });
+
+    bindEv('mute-game-btn', 'click', (e) => {
+        globalMute = !globalMute;
+        const btn = e.currentTarget;
+        if (globalMute) {
+            btn.classList.add('active-mute');
+            btn.innerHTML = '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
+            if (phaserGame && phaserGame.sound) phaserGame.sound.mute = true;
+        } else {
+            btn.classList.remove('active-mute');
+            btn.innerHTML = '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2.5" stroke-linecap="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19 12h.01 M16 9h.01 M16 15h.01 M22 9h.01 M22 15h.01"/></svg>';
+            if (phaserGame && phaserGame.sound) phaserGame.sound.mute = false;
+        }
     });
 
     // Ping
     setInterval(() => {
         const t = Date.now();
-        socket.emit('pingEvent', () => { 
+        socket.emit('pingEvent', () => {
             const p = document.getElementById('ping-val');
-            if (p) p.textContent = Date.now() - t; 
+            if (p) p.textContent = Date.now() - t;
         });
     }, 2000);
+});
 
-}); // End DOMContentLoaded
+// ─── Socket Connections ──────────────────────────────────────
+function enterLobby(username, token) {
+    currentUser = username;
+    currentToken = token;
+    const dp = document.getElementById('username-display');
+    if (dp) dp.textContent = username;
+    socket.emit('identify', { username, token });
+    showScreen('lobby-screen');
+}
 
-// ═══════════════════════════════════════════════════════════
-//  PHASER GAME — HIGH RESOLUTION
-// ═══════════════════════════════════════════════════════════
+socket.on('roomCreated', (data) => {
+    const rc = document.getElementById('room-code-display');
+    if (rc) rc.textContent = data.code;
+    showScreen('room-screen');
+});
+
+socket.on('joinError', (msg) => {
+    const je = document.getElementById('join-error');
+    if (je) je.textContent = msg;
+});
+
+socket.on('gameStarted', (data) => {
+    const m = document.getElementById('join-modal');
+    if (m) m.classList.add('hidden');
+    startGame(data.players);
+});
+
+socket.on('gameOver', (data) => {
+    const overlay = document.getElementById('gameover-overlay');
+    if (!overlay) return;
+    const t = document.getElementById('gameover-title');
+    const r = document.getElementById('gameover-reason');
+    if (t) t.textContent = data.winner === currentUser ? 'You Win!' : 'You Lose';
+    if (r) r.textContent = data.reason;
+    overlay.classList.remove('hidden');
+});
+
+// Groups Sync
+socket.on('groupCreated', () => socket.emit('getGroups'));
+socket.on('groupJoined', () => socket.emit('getGroups'));
+socket.on('groupsList', (list) => {
+    const c = document.getElementById('group-list');
+    if (!c) return;
+    c.innerHTML = '';
+    list.forEach(g => {
+        const card = document.createElement('div');
+        card.className = 'group-card';
+        let membersHTML = g.members.map(m =>
+            `<div class="member-row"><span class="status-dot ${m.online ? 'online' : 'offline'}"></span><span>${m.name}</span></div>`
+        ).join('');
+        card.innerHTML = `<h4>${g.name} <small>ID: ${g.id}</small></h4>${membersHTML}<button class="btn-block btn-blue play-now-btn" data-gid="${g.id}">Play Now</button>`;
+        c.appendChild(card);
+    });
+    c.querySelectorAll('.play-now-btn').forEach(btn => {
+        btn.addEventListener('click', () => socket.emit('groupInvite', { groupId: btn.dataset.gid }));
+    });
+});
+socket.on('presenceUpdate', () => {
+    const gs = document.getElementById('group-screen');
+    if (gs && gs.classList.contains('active')) socket.emit('getGroups');
+});
+
+// Match Invites
+socket.on('matchInvite', (data) => {
+    const toast = document.getElementById('invite-toast');
+    if (!toast) return;
+    const msg = document.getElementById('invite-msg');
+    if (msg) msg.textContent = `${data.from} invited you from ${data.groupName}!`;
+    toast.classList.remove('hidden');
+    document.getElementById('invite-accept').onclick = () => { socket.emit('joinRoom', { code: data.code }); toast.classList.add('hidden'); };
+    document.getElementById('invite-decline').onclick = () => { toast.classList.add('hidden'); };
+});
+
+// ─── Phaser Integration ──────────────────────────────────────
 let serverState = null;
 let ballSprites = [];
 let shadowSprites = [];
@@ -322,178 +281,149 @@ function startGame(players) {
 }
 
 function gamePreload() {
-    const TEX_SIZE = (BALL_R + 1) * 2;
-    this.load.svg('table', 'assets/table.svg', { width: GAME_W, height: GAME_H });
-    this.load.svg('cue_stick', 'assets/cue_stick.svg', { width: 14, height: 420 });
+    this.load.svg('table_tex', 'assets/table.svg', { width: GAME_W, height: GAME_H });
     for (let i = 0; i <= 15; i++) {
-        this.load.svg('ball_' + i, 'assets/ball_' + i + '.svg', { width: TEX_SIZE, height: TEX_SIZE });
+        this.load.svg(`ball_${i}`, `assets/ball_${i}.svg`, { width: BALL_R*4, height: BALL_R*4 });
     }
+    this.load.svg('cue_stick', 'assets/cue_stick.svg', { width: 10, height: 260 }); // Roughly long thin
+    this.load.audio('hit', 'https://labs.phaser.io/assets/audio/SoundEffects/squit.wav');
 }
 
 function gameCreate() {
-    const scene = this;
-    const TEX_SIZE = (BALL_R + 1) * 2;
-    const DISPLAY_SIZE = (BALL_R + 1) * 2;
+    // 1. Render Table Base SVG
+    this.add.image(GAME_W/2, GAME_H/2, 'table_tex');
 
-    // ─── Table ───────────────────────────────────────────────
-    scene.add.image(GAME_W / 2, GAME_H / 2, 'table');
-    
-    // ─── Cue Stick ───────────────────────────────────────────
-    scene.cueSprite = scene.add.image(-100, -100, 'cue_stick').setOrigin(0.5, 0).setVisible(false).setDepth(10);
-
-    // Shadow texture (soft gaussian-like)
-    const sg = scene.make.graphics({ add: false });
-    sg.fillStyle(0x000000, 0.15); sg.fillCircle(TEX_SIZE / 2 + 1, TEX_SIZE / 2 + 1, TEX_SIZE / 2 - 2);
-    sg.fillStyle(0x000000, 0.25); sg.fillCircle(TEX_SIZE / 2, TEX_SIZE / 2, TEX_SIZE / 2 - 4);
-    sg.generateTexture('shadow', TEX_SIZE, TEX_SIZE); sg.destroy();
-
-    ballSprites = []; shadowSprites = [];
-    const scale = 1;
-    for (let i = 0; i < 16; i++) {
-        const sh = scene.add.sprite(-100, -100, 'shadow').setScale(scale * 1.15).setAlpha(0.5);
-        shadowSprites.push(sh);
-    }
-    for (let i = 0; i < 16; i++) {
-        const sp = scene.add.sprite(-100, -100, 'ball_' + i).setScale(scale);
-        ballSprites.push(sp);
+    // 2. Shadows & Balls
+    ballSprites = [];
+    shadowSprites = [];
+    for (let i = 0; i <= 15; i++) {
+        let shadow = this.add.circle(0, 0, BALL_R, 0x000000, 0.4);
+        let sprite = this.add.sprite(0, 0, `ball_${i}`);
+        sprite.setDisplaySize(BALL_R*2, BALL_R*2);
+        shadow.setVisible(false);
+        sprite.setVisible(false);
+        shadowSprites.push(shadow);
+        ballSprites.push(sprite);
     }
 
-    aimGraphics = scene.add.graphics();
+    // 3. Cue Stick & Aim Line
+    aimGraphics = this.add.graphics();
+    let cueSprite = this.add.sprite(0, 0, 'cue_stick');
+    cueSprite.setOrigin(0.5, 0); // Origin at tip
+    cueSprite.setVisible(false);
+    this.cueSprite = cueSprite; 
 
-    // Power bar background + fill
-    scene.powerBarBg = scene.add.rectangle(GAME_W - 25, GAME_H / 2, 12, 200, 0x222222, 0.6).setVisible(false);
-    scene.powerBarFill = scene.add.rectangle(GAME_W - 25, GAME_H / 2 + 100, 10, 0, 0x22C55E).setOrigin(0.5, 1).setVisible(false);
-
-    // ─── Touch Input ─────────────────────────────────────────
-    scene.input.on('pointerdown', (ptr) => {
-        if (!serverState || serverState.phase !== 'aiming') return;
-        if (myPlayerIndex !== serverState.turn) return;
-        const cue = serverState.balls[0];
-        if (cue.p) return;
-        dragState = { sx: ptr.worldX, sy: ptr.worldY, cx: cue.x, cy: cue.y };
+    // Sound Setup
+    this.sound.mute = globalMute;
+    socket.on('ballHit', () => {
+        this.sound.play('hit', { volume: 0.3 });
     });
 
-    scene.input.on('pointermove', (ptr) => {
-        if (!dragState || !serverState) return;
-        aimGraphics.clear();
-
-        const dist = Phaser.Math.Distance.Between(dragState.sx, dragState.sy, ptr.worldX, ptr.worldY);
-        const dragDist = Math.min(dist, MAX_DRAG);
-        const dragAngle = Phaser.Math.Angle.Between(dragState.sx, dragState.sy, ptr.worldX, ptr.worldY);
-        const shootAngle = dragAngle + Math.PI;
-
-        // Aiming line with dotted segments
-        const dx = Math.cos(shootAngle), dy = Math.sin(shootAngle);
-        let minT = 350, hitWall = null;
-        if (dx > 0) { const t = (TBL_R - BALL_R - dragState.cx) / dx; if (t > 0 && t < minT) { minT = t; hitWall = 'v'; } }
-        if (dx < 0) { const t = (TBL_L + BALL_R - dragState.cx) / dx; if (t > 0 && t < minT) { minT = t; hitWall = 'v'; } }
-        if (dy > 0) { const t = (TBL_B - BALL_R - dragState.cy) / dy; if (t > 0 && t < minT) { minT = t; hitWall = 'h'; } }
-        if (dy < 0) { const t = (TBL_T + BALL_R - dragState.cy) / dy; if (t > 0 && t < minT) { minT = t; hitWall = 'h'; } }
-
-        const hitX = dragState.cx + dx * minT, hitY = dragState.cy + dy * minT;
-
-        // Dotted aiming line
-        aimGraphics.lineStyle(1.8, 0xffffff, 0.7);
-        const dotLen = 6, gapLen = 4;
-        const totalLen = minT;
-        let drawn = 0;
-        aimGraphics.beginPath();
-        while (drawn < totalLen) {
-            const startD = drawn, endD = Math.min(drawn + dotLen, totalLen);
-            aimGraphics.moveTo(dragState.cx + dx * startD, dragState.cy + dy * startD);
-            aimGraphics.lineTo(dragState.cx + dx * endD, dragState.cy + dy * endD);
-            drawn = endD + gapLen;
+    // 4. Input Events
+    this.input.on('pointerdown', (pointer) => {
+        if (myPlayerIndex === -1) return;
+        if (!serverState || serverState.turn !== myPlayerIndex) return;
+        if (serverState.isMoving) return;
+        
+        let cb = serverState.balls[0];
+        if (!cb.pocketed) {
+            let dx = pointer.x - cb.x;
+            let dy = pointer.y - cb.y;
+            if (Math.sqrt(dx*dx + dy*dy) < BALL_R * 3) { // generous hit box
+                dragState = { startX: pointer.x, startY: pointer.y, currentX: pointer.x, currentY: pointer.y };
+            }
         }
-        aimGraphics.strokePath();
-
-        // Ghost ball indicator at hit point
-        aimGraphics.lineStyle(1, 0xffffff, 0.35);
-        aimGraphics.strokeCircle(hitX, hitY, BALL_R);
-
-        // Reflection line
-        if (hitWall && minT < 350) {
-            let rdx = dx, rdy = dy;
-            if (hitWall === 'v') rdx = -dx;
-            if (hitWall === 'h') rdy = -dy;
-            aimGraphics.lineStyle(1, 0xffffff, 0.2);
-            aimGraphics.beginPath(); aimGraphics.moveTo(hitX, hitY); aimGraphics.lineTo(hitX + rdx * 100, hitY + rdy * 100); aimGraphics.strokePath();
-        }
-
-        // Cue Stick
-        scene.cueSprite.setVisible(true);
-        const pullback = 5 + (dragDist * 0.5);
-        scene.cueSprite.x = dragState.cx + Math.cos(dragAngle) * pullback;
-        scene.cueSprite.y = dragState.cy + Math.sin(dragAngle) * pullback;
-        scene.cueSprite.rotation = dragAngle - Math.PI / 2;
-
-        // Power bar
-        const power = dragDist / MAX_DRAG;
-        scene.powerBarBg.setVisible(true); scene.powerBarFill.setVisible(true);
-        scene.powerBarFill.setSize(10, power * 200);
-        const r = Math.floor(34 + (239 - 34) * power);
-        const g2 = Math.floor(197 + (68 - 197) * power);
-        const b = Math.floor(94 + (68 - 94) * power);
-        scene.powerBarFill.setFillStyle(Phaser.Display.Color.GetColor(r, g2, b));
     });
 
-    scene.input.on('pointerup', (ptr) => {
+    this.input.on('pointermove', (pointer) => {
         if (!dragState) return;
-        aimGraphics.clear();
-        scene.powerBarBg.setVisible(false); scene.powerBarFill.setVisible(false);
-        scene.cueSprite.setVisible(false);
+        dragState.currentX = pointer.x;
+        dragState.currentY = pointer.y;
+    });
 
-        const dist = Phaser.Math.Distance.Between(dragState.sx, dragState.sy, ptr.worldX, ptr.worldY);
-        if (dist > 8) {
-            const dragDist = Math.min(dist, MAX_DRAG);
-            const angle = Phaser.Math.Angle.Between(dragState.sx, dragState.sy, ptr.worldX, ptr.worldY);
-            socket.emit('shoot', { angle: angle + Math.PI, force: dragDist / MAX_DRAG });
+    this.input.on('pointerup', () => {
+        if (!dragState) return;
+        let dx = dragState.startX - dragState.currentX;
+        let dy = dragState.startY - dragState.currentY;
+        let force = Math.sqrt(dx*dx + dy*dy);
+        if (force > 5) {
+            let clampedForce = Math.min(force, MAX_DRAG);
+            socket.emit('shoot', { vec: { x: dx, y: dy }, power: clampedForce / MAX_DRAG });
         }
         dragState = null;
+        aimGraphics.clear();
+        this.cueSprite.setVisible(false);
     });
 }
 
 function gameUpdate() {
-    if (!serverState || !serverState.balls) return;
-    const balls = serverState.balls;
-    for (let i = 0; i < Math.min(balls.length, 16); i++) {
-        if (balls[i].p) {
-            ballSprites[i].setVisible(false); shadowSprites[i].setVisible(false);
+    if (!serverState) return;
+    let s = serverState;
+
+    // Turn UI
+    const ti = document.getElementById('turn-indicator');
+    if (ti) {
+        if (s.turn === 0) ti.className = 'turn-arrow turn-indicator-left';
+        else ti.className = 'turn-arrow turn-indicator-right';
+    }
+
+    // P1 & P2 pocketed sync
+    const p1Container = document.getElementById('p1-dots');
+    const p2Container = document.getElementById('p2-dots');
+    if (p1Container && p2Container) {
+        p1Container.innerHTML = ''; p2Container.innerHTML = '';
+        s.balls.forEach((b, i) => {
+            if (i > 0 && i < 8) {
+                let div = document.createElement('div');
+                div.className = b.pocketed ? 'ball-dot pocketed' : 'ball-dot';
+                div.style.background = '#EF4444'; // Red for Solids
+                (s.players[0].assigned === 'solids' ? p1Container : p2Container).appendChild(div);
+            }
+            if (i > 8) {
+                let div = document.createElement('div');
+                div.className = b.pocketed ? 'ball-dot pocketed' : 'ball-dot';
+                div.style.background = '#3B82F6'; // Blue for Stripes
+                (s.players[0].assigned === 'stripes' ? p1Container : p2Container).appendChild(div);
+            }
+        });
+    }
+
+    // Positions mapping
+    for (let i = 0; i <= 15; i++) {
+        let b = s.balls[i];
+        let spr = ballSprites[i];
+        let shd = shadowSprites[i];
+        if (b.pocketed) {
+            spr.setVisible(false); shd.setVisible(false);
         } else {
-            ballSprites[i].setVisible(true); shadowSprites[i].setVisible(true);
-            ballSprites[i].x = balls[i].x; ballSprites[i].y = balls[i].y; ballSprites[i].rotation = balls[i].a;
-            shadowSprites[i].x = balls[i].x + 2.5; shadowSprites[i].y = balls[i].y + 3.5;
+            spr.setVisible(true); shd.setVisible(true);
+            spr.setPosition(b.x, b.y);
+            spr.rotation += (b.vx || 0) * 0.1; 
+            shd.setPosition(b.x + 3, b.y + 3);
         }
     }
-    updateScoreboard();
-}
 
-function updateScoreboard() {
-    if (!serverState) return;
-    const t = serverState.turn;
-    const p1 = document.getElementById('p1-info'), p2 = document.getElementById('p2-info');
-    const arrow = document.getElementById('turn-indicator');
-    p1.classList.toggle('active-turn', t === 0);
-    p2.classList.toggle('active-turn', t === 1);
-    arrow.classList.toggle('left', t === 0);
-    arrow.classList.toggle('right', t === 1);
+    // Aim Line & Cue Rotation
+    aimGraphics.clear();
+    this.cueSprite.setVisible(false);
+    
+    if (dragState) {
+        let cb = s.balls[0];
+        let dx = dragState.startX - dragState.currentX;
+        let dy = dragState.startY - dragState.currentY;
+        let dist = Math.min(Math.sqrt(dx*dx + dy*dy), MAX_DRAG);
+        if (dist > 5) {
+            let angle = Math.atan2(dy, dx);
+            aimGraphics.lineStyle(2, 0xFFFFFF, 0.4);
+            aimGraphics.beginPath();
+            aimGraphics.moveTo(cb.x, cb.y);
+            aimGraphics.lineTo(cb.x + Math.cos(angle)*dist*2, cb.y + Math.sin(angle)*dist*2);
+            aimGraphics.strokePath();
 
-    const pocketed = new Set(serverState.pocketed || []);
-    updateDots('p1-dots', serverState.assignments[0], pocketed);
-    updateDots('p2-dots', serverState.assignments[1], pocketed);
-}
-
-function updateDots(id, assignment, pocketed) {
-    const c = document.getElementById(id);
-    if (!c) return;
-    c.innerHTML = '';
-    if (!assignment) { c.innerHTML = '<span style="font-size:0.7rem;color:#9CA3AF">--</span>'; return; }
-    const range = assignment === 'solids' ? [1,2,3,4,5,6,7] : [9,10,11,12,13,14,15];
-    range.forEach(n => {
-        const bi = serverState.balls.findIndex(b => b.n === n);
-        const p = bi >= 0 && serverState.balls[bi].p;
-        const dot = document.createElement('span');
-        dot.className = 'ball-dot' + (p ? ' pocketed' : '');
-        dot.style.background = BALL_CSS[n];
-        c.appendChild(dot);
-    });
+            this.cueSprite.setVisible(true);
+            let offsetDist = BALL_R + 5 + dist;
+            this.cueSprite.setPosition(cb.x - Math.cos(angle)*offsetDist, cb.y - Math.sin(angle)*offsetDist);
+            this.cueSprite.rotation = angle - Math.PI/2; 
+        }
+    }
 }
